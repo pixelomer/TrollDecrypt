@@ -89,6 +89,11 @@
     NSURL *url = [NSURL fileURLWithPath:path];
 
     UIActivityViewController *activityViewController = [[UIActivityViewController alloc] initWithActivityItems:@[url] applicationActivities:nil];
+    if (UI_USER_INTERFACE_IDIOM() == UIUserInterfaceIdiomPad) {
+        activityViewController.popoverPresentationController.sourceView = tableView;
+        activityViewController.popoverPresentationController.sourceRect = [tableView rectForRowAtIndexPath:indexPath];
+        activityViewController.popoverPresentationController.permittedArrowDirections = UIPopoverArrowDirectionAny;
+    }
     [self presentViewController:activityViewController animated:YES completion:nil];
 
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
