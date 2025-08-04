@@ -1,0 +1,134 @@
+# The MIT License (MIT)
+#
+# Copyright (c) 2020 Randomblock1
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+#
+# Modifications by pixelomer to specify which SDK to download.
+#
+# The MIT License (MIT)
+# Copyright (c) 2025 pixelomer
+#
+
+name: "Install Theos"
+description: "Install Theos and prepare it for building projects"
+author: "Randomblock1"
+branding:
+  icon: download-cloud
+  color: purple
+
+inputs:
+  theos-dir:
+    description: "Where to install Theos"
+    required: false
+    default: ${{ github.workspace }}/theos
+  theos-src:
+    description: "Where to clone Theos from (git URL)"
+    required: false
+    default: "https://github.com/theos/theos"
+  theos-sdks:
+    description: "Where to clone the iOS SDKs from (GitHub repository URL)"
+    required: false
+    default: "https://github.com/theos/sdks"
+  theos-sdks-branch:
+    description: "Which branch to clone from SDK repo"
+    required: false
+    default: "master"
+  sdk-urls:
+    description: "Where to download SDK.tar.xz from (theos-sdks is ignored if sdk-urls is specified)"
+    required: false
+    default: ""
+  orion:
+    description: "Whether to enable Orion, which adds support for Swift tweaks"
+    required: false
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup (MacOS)
+      shell: bash
+      if: runner.os == 'macOS'
+      run: |
+        brew install ldid make
+        echo "PATH=$(brew --prefix make)/libexec/gnubin:$PATH" >> $GITHUB_ENV
+
+    - name: Setup (Linux)
+      shell: bash
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential fakeroot libtinfo6 libz3-dev rsync curl perl unzip git libplist-utils
+
+    - name: Setup environment
+      shell: bash
+      run: echo "THEOS=${{ inputs.theos-dir }}" >> $GITHUB_ENV
+
+    - name: Download Theos
+      shell: bash
+      run: |
+        if [ ! -d "${{ inputs.theos-dir }}" ]; then
+          git clone ${{ inputs.theos-src }} ${{ inputs.theos-dir }} --recursive
+          echo "Theos successfully downloaded."
+        else
+          echo "Theos already cached."
+        fi
+
+    - name: Get toolchain (Linux)
+      shell: bash
+      if: runner.os == 'Linux'
+      run: |
+        if [[ "$(ls ${{ inputs.theos-dir }}/sdks)" ]]; then
+          echo "Linux toolchain already cached, skipping..."
+        else
+          curl -sL https://github.com/L1ghtmann/llvm-project/releases/latest/download/iOSToolchain-x86_64.tar.xz | tar -xJf - -C $THEOS/toolchain/
+        fi
+
+    - name: Get SDKs
+      shell: bash
+      run: |
+        if [[ "$(ls ${{ inputs.theos-dir }}/sdks)" ]]; then
+          echo "Theos SDKs already cached, skipping..."
+        elif [[ ! -z "${{ inputs.sdk-urls }}" ]]; then
+          for url in ${{ inputs.sdk-urls }}; do
+            wget --no-verbose -Osdk "$url"
+            TAR="$(realpath sdk)"
+            pushd ${{ inputs.theos-dir }}/sdks
+            tar -xJf "${TAR}"
+            popd
+            rm "${TAR}"
+          done
+        else
+          cd ${{ inputs.theos-dir }}/sdks
+          wget --no-verbose ${{ inputs.theos-sdks }}/archive/${{ inputs.theos-sdks-branch }}.zip
+          TMP=$(mktemp -d)
+          7z x ${{ inputs.theos-sdks-branch }}.zip -o$TMP
+          mv $TMP/*-${{ inputs.theos-sdks-branch }}/*.sdk $THEOS/sdks
+          rm -r ${{ inputs.theos-sdks-branch }}.zip $TMP
+        fi
+
+    - name: Enable Orion
+      shell: bash
+      if: inputs.orion == 'true'
+      run: |
+        cd ${{ inputs.theos-dir }}
+        git fetch
+        git checkout orion
+        git submodule update --init

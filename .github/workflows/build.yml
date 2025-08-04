@@ -1,0 +1,23 @@
+name: Build release (macOS)
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - name: Install Theos
+        uses: ./.github/actions/install-theos
+        with:
+          sdk-urls: https://github.com/theos/sdks/releases/download/master-146e41f/iPhoneOS16.5.sdk.tar.xz
+      - name: Build
+        run: |
+          FINALPACKAGE=1 DEBUG=0 make package
+      - name: Archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: packages
