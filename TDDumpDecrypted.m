@@ -585,6 +585,10 @@ int find_off_cryptid(const char *filePath) {
 	[self dumpDecrypted:pid];
 	NSLog(@"[trolldecrypt] ======== DECRYPTION COMPLETE  ========");
 
+	// Remove signature-related files
+	[fm removeItemAtPath:[appCopyDir stringByAppendingPathComponent:@"_CodeSignature"] error:nil];
+	[fm removeItemAtPath:[appCopyDir stringByAppendingPathComponent:@"SC_Info"] error:nil];
+
 	// ZIP it up
 	NSLog(@"[trolldecrypt] ======== STARTING ZIP ========");
 	NSLog(@"[trolldecrypt] IPA file: %@", IPAFile);
